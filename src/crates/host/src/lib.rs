@@ -16,6 +16,7 @@ mod deepseek_plugin;
 mod demo;
 pub mod extension;
 mod hud;
+mod installation;
 mod instance;
 mod mcp_clients;
 mod messages;
@@ -46,6 +47,14 @@ fn startup_mode(state: tauri::State<'_, AppState>) -> AppState {
 #[derive(Clone, Default)]
 pub struct HostOptions {
     pub canonical_executable: Option<std::path::PathBuf>,
+}
+impl HostOptions {
+    /// Packaging policy for the installed desktop, never inferred from a build directory.
+    pub fn installed() -> Self {
+        Self {
+            canonical_executable: installation::canonical(),
+        }
+    }
 }
 pub fn run_with_context(
     context: tauri::Context<tauri::Wry>,
