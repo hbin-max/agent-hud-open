@@ -30,7 +30,7 @@ fn wide(value: &OsStr) -> Vec<u16> {
     use std::os::windows::ffi::OsStrExt;
     value.encode_wide().chain(Some(0)).collect()
 }
-pub(super) struct Local(pub(super) *mut c_void);
+pub(crate) struct Local(pub(crate) *mut c_void);
 impl Drop for Local {
     fn drop(&mut self) {
         if !self.0.is_null() {
@@ -38,7 +38,7 @@ impl Drop for Local {
         }
     }
 }
-pub(super) fn sid() -> Result<String, String> {
+pub(crate) fn sid() -> Result<String, String> {
     unsafe {
         let mut token: HANDLE = std::ptr::null_mut();
         if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
@@ -74,7 +74,7 @@ pub(super) fn sid() -> Result<String, String> {
         )))
     }
 }
-pub(super) fn security(inherit: bool) -> Result<Local, String> {
+pub(crate) fn security(inherit: bool) -> Result<Local, String> {
     let sid = sid()?;
     let flags = if inherit { "OICI" } else { "" };
     let sddl = wide(OsStr::new(&format!(

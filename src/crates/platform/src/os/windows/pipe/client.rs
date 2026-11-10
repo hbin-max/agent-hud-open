@@ -17,6 +17,24 @@ pub fn request(
     request_limit: usize,
     response_limit: usize,
     timeout: Duration,
+    settled: impl FnMut() -> bool,
+) -> Result<Option<Value>, String> {
+    request_named(
+        &name(data, channel)?,
+        message,
+        request_limit,
+        response_limit,
+        timeout,
+        settled,
+    )
+}
+
+pub(crate) fn request_named(
+    name: &str,
+    message: &Value,
+    request_limit: usize,
+    response_limit: usize,
+    timeout: Duration,
     mut settled: impl FnMut() -> bool,
 ) -> Result<Option<Value>, String> {
     let mut bytes = serde_json::to_vec(message).unwrap();
@@ -24,13 +42,12 @@ pub fn request(
     if bytes.len() > request_limit {
         return Err("The local IPC request is too large".into());
     }
-    let name = name(data, channel)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|_| "The local IPC runtime is unavailable")?;
     runtime.block_on(async {
-        let mut stream = connect(&name, timeout.min(Duration::from_secs(2))).await?;
+        let mut stream = connect(name, timeout.min(Duration::from_secs(2))).await?;
         tokio::time::timeout(Duration::from_secs(2), stream.write_all(&bytes))
             .await
             .map_err(|_| "The local IPC request timed out")?

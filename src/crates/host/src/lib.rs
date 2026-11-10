@@ -74,6 +74,7 @@ pub fn run_with_options(
         }
     };
     agent_hud_runtime::l10n::set_system_chinese(shell::system_prefers_chinese());
+    let desktop_instance = instance::claim_desktop_or_exit(demo);
     let instance = if demo {
         None
     } else {
@@ -227,6 +228,10 @@ pub fn run_with_options(
             if let Some(lock) = instance {
                 let handle = app.handle().clone();
                 app.manage(lock.listen(Arc::new(move || auxiliary::show(&handle))));
+            }
+            if let Some(guard) = desktop_instance {
+                let handle = app.handle().clone();
+                app.manage(guard.listen(Arc::new(move || auxiliary::show(&handle)))?);
             }
             Ok(())
         })

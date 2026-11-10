@@ -10,6 +10,20 @@
 use agent_hud_runtime::instance::{self, CollectorError, CollectorLocks};
 use std::path::{Path, PathBuf};
 
+pub(crate) fn claim_desktop_or_exit(demo: bool) -> Option<instance::desktop::Guard> {
+    if demo {
+        return None;
+    }
+    match instance::desktop::claim() {
+        Ok(Some(guard)) => Some(guard),
+        Ok(None) => std::process::exit(0),
+        Err(error) => {
+            unavailable(&error);
+            std::process::exit(2);
+        }
+    }
+}
+
 pub(crate) enum Launch {
     /// Run only while every resource lock remains owned.
     Run(CollectorLocks),
@@ -55,9 +69,9 @@ pub(crate) fn unavailable(error: &str) {
         "Agent HUD could not start"
     };
     let body = if chinese {
-        format!("无法准备数据目录或客户端回调，采集未启动。\n{error}")
+        format!("无法取得运行实例或准备数据目录，未启动新实例。\n{error}")
     } else {
-        format!("The data directory or client hooks could not be prepared. Collection has not started.\n{error}")
+        format!("The running instance or data directory could not be prepared. No new instance has started.\n{error}")
     };
     crate::shell::alert(title, &body, "OK");
 }

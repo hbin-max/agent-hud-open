@@ -28,6 +28,15 @@ mod endpoint;
 
 pub type OnShow = Arc<dyn Fn() + Send + Sync>;
 
+// Desktop ownership is separate from collector/data ownership. Windows must
+// also exclude copies launched with redirected or explicitly separate data.
+#[cfg(windows)]
+#[path = "desktop_windows.rs"]
+pub mod desktop;
+#[cfg(unix)]
+#[path = "desktop_unix.rs"]
+pub mod desktop;
+
 pub enum Claim {
     /// This process holds the lock for as long as it keeps the value.
     Acquired(InstanceLock),

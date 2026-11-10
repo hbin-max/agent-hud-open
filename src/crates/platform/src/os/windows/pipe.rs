@@ -22,7 +22,9 @@ use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
 
 mod client;
 
+pub(crate) use super::acl::{security as user_security, sid as user_sid};
 pub use client::request;
+pub(crate) use client::request_named;
 
 pub(crate) fn name(data: &Path, channel: &str) -> Result<String, String> {
     let mut hash = Sha256::new();
@@ -72,6 +74,18 @@ impl Server {
     ) -> Result<Self, String> {
         private_directory(data)?;
         let name = name(data, channel)?;
+        Self::start_named(&name, request_limit, response_limit, handler)
+    }
+
+    /// A caller-owned identity independent of filesystem redirection. The same
+    /// per-user ACL, local-only transport and message limits still apply.
+    pub(crate) fn start_named(
+        name: &str,
+        request_limit: usize,
+        response_limit: usize,
+        handler: Handler,
+    ) -> Result<Self, String> {
+        let name = name.to_owned();
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .max_blocking_threads(64)
@@ -85,7 +99,7 @@ impl Server {
         let active = running.clone();
         let (stop, mut stopped) = watch::channel(false);
         let thread = std::thread::Builder::new()
-            .name(format!("agenthud-{channel}-pipe"))
+            .name("agenthud-local-pipe".into())
             .spawn(move || {
                 runtime.block_on(async move {
                     let mut listener = initial;
