@@ -87,7 +87,20 @@ fn row_id(channel: &Path) -> String {
         .take(3)
         .map(|byte| format!("{byte:02x}"))
         .collect();
-    format!("{ROW}-{}-{place}", version())
+    let id = format!("{ROW}-{}-{place}", version());
+    if cfg!(windows) {
+        format!("{id}-fileurl")
+    } else {
+        id
+    }
+}
+
+fn module_specifier(file: &Path) -> String {
+    #[cfg(windows)]
+    if let Ok(url) = reqwest::Url::from_file_path(file) {
+        return url.to_string();
+    }
+    file.to_string_lossy().into_owned()
 }
 
 /// The row that loads `file` and points it at `channel`.
@@ -103,7 +116,7 @@ fn block(file: &Path, channel: &Path) -> String {
         start = PLUGIN.start,
         end = PLUGIN.end,
         id = row_id(channel),
-        file = patch::quoted(&file.to_string_lossy()),
+        file = patch::quoted(&module_specifier(file)),
         channel = patch::quoted(&channel.to_string_lossy()),
     )
 }

@@ -35,6 +35,23 @@ fn the_version_names_the_file_and_the_row() {
     assert!(row_id(channel).starts_with(&format!("agent-hud-plugin-{version}-")));
 }
 
+#[cfg(windows)]
+#[test]
+fn windows_module_path_is_a_file_url_with_escaped_unicode_and_spaces() {
+    let file = Path::new(r"C:\用户\Agent HUD\agent-hud.mjs");
+    let specifier = module_specifier(file);
+    assert!(specifier.starts_with("file:///C:/"));
+    assert!(specifier.contains("Agent%20HUD"));
+    assert_eq!(
+        reqwest::Url::parse(&specifier)
+            .unwrap()
+            .to_file_path()
+            .unwrap(),
+        file
+    );
+    assert!(row_id(Path::new(r"C:\channel")).ends_with("-fileurl"));
+}
+
 #[test]
 fn a_moved_folder_gives_the_row_a_new_id() {
     let temp = tempfile::tempdir().unwrap();
