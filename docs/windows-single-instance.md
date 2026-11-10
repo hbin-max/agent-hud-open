@@ -51,7 +51,25 @@ node src/tooling/check-test-paths.mjs
 
 The native tests cover exclusivity, simultaneous acquisition, release, startup
 handover, an unresponsive owner, user identities, and a copied test executable
-with different AppData and explicit data-directory settings.
+with different AppData and explicit data-directory settings. The copied process
+must receive a handover acknowledgement, and the original process must observe
+the show callback. A separate child is terminated to test crash recovery.
+
+Local validation on Windows, 2026-11-10 (Rust 1.99.1):
+
+| Check | Result |
+| --- | --- |
+| `cargo test -p agent-hud-platform --locked` | 206 passed, 1 ignored (existing signed-in Antigravity live test) |
+| `cargo test -p agent-hud-platform instance::desktop::tests --locked -- --nocapture` | 10 passed, including child helper entry points |
+| `cargo test -p agent-hud-host instance::tests -- --nocapture` | 2 passed; desktop host compiled |
+| `cargo clippy -p agent-hud-platform -p agent-hud-host --tests --locked -- -D warnings` | Passed |
+| `cargo fmt --all --check` | Passed |
+| Platform, package, file-size and test-path boundary scripts | Passed |
+
+The branch also includes a Windows GitHub Actions workflow for native instance
+regressions. Local automated checks do not certify the full packaged GUI,
+elevation/session combinations, or macOS/Linux behavior; the release acceptance
+checks below remain necessary before distributing an installer.
 
 For release acceptance, use two **updated application builds** in different
 folders. Launch via Explorer, shortcut and command line, including rapid
