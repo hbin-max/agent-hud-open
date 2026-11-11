@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 
 const APP: &str = "/Applications/Agent HUD.app/Contents/MacOS/Agent HUD";
@@ -334,4 +334,37 @@ fn antigravity_turns_a_server_back_on_and_counts_a_turned_off_one_as_absent() {
     )
     .unwrap();
     assert_eq!(left, serde_json::json!({"mcpServers": {}}));
+}
+
+#[test]
+fn json_server_path_repair_requires_a_missing_enabled_standard_entry() {
+    let temp = tempfile::tempdir().unwrap();
+    let old = temp.path().join("old/Agent HUD.exe");
+    let current = temp.path().join("current/Agent HUD.exe");
+    let text = json!({
+        "mcpServers": {
+            "agent-hud": {
+                "command": old,
+                "args": ["--mcp"]
+            }
+        }
+    })
+    .to_string();
+    assert!(mcp_json::missing_known_executable(Some(&text), &current));
+
+    fs::create_dir_all(old.parent().unwrap()).unwrap();
+    fs::write(&old, "custom copy").unwrap();
+    assert!(!mcp_json::missing_known_executable(Some(&text), &current));
+
+    let disabled = json!({
+        "mcpServers": {
+            "agent-hud": {
+                "command": current,
+                "args": ["--mcp"],
+                "disabled": true
+            }
+        }
+    })
+    .to_string();
+    assert!(!mcp_json::missing_known_executable(Some(&disabled), &old));
 }
