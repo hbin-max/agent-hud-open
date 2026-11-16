@@ -1,11 +1,8 @@
 //! HUD tools in each agent client, only after an explicit Settings action:
 //! Agent HUD's MCP server, added with the client's own command where it has
 //! one and in its settings file where it does not, and the skill that
-//! teaches the agent to use it. At launch, the skill of every client that
-//! has the server is brought up to date. At launch, a marked DeepSeek Harness
-//! server and an unambiguously broken file-managed server follow this fixed
-//! installation's executable, so moving or reinstalling the app cannot leave
-//! a stale absolute path behind.
+//! teaches the agent to use it. At launch, every client that has the server
+//! is pointed at this copy again and its skill brought up to date.
 use crate::client_cli::{executable, run_client};
 use agent_hud_runtime::hud_tools::{Client, Places, SkillState, CLIENTS};
 use serde_json::{json, Value};
@@ -16,6 +13,8 @@ use std::{
     time::Duration,
 };
 use tauri::Manager;
+#[path = "mcp_clients/entry.rs"]
+mod entry;
 #[derive(Default)]
 pub struct Clients(Mutex<()>);
 fn client(id: &str) -> Result<Client, String> {
@@ -23,41 +22,25 @@ fn client(id: &str) -> Result<Client, String> {
 }
 /// Whether the client lists Agent HUD's server.
 fn installed(client: Client, places: &Places) -> bool {
-    let path = match client {
-        Client::ClaudeCode => std::env::var_os("CLAUDE_CONFIG_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| places.home.clone())
-            .join(".claude.json"),
-        Client::Codex => std::env::var_os("CODEX_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| places.home.join(".codex"))
-            .join("config.toml"),
-        Client::Cursor | Client::DeepSeek | Client::Antigravity => return client.listed(places),
-    };
-    let Ok(meta) = fs::metadata(&path) else {
-        return false;
-    };
-    if meta.len() > 4 * 1024 * 1024 {
-        return false;
+    match client {
+        Client::ClaudeCode | Client::Codex => entry::listed(client, places).is_some(),
+        _ => client.listed(places),
     }
-    let Ok(text) = fs::read_to_string(path) else {
-        return false;
-    };
-    if client == Client::ClaudeCode {
-        serde_json::from_str::<Value>(&text)
-            .ok()
-            .and_then(|v| v["mcpServers"].get("agent-hud").cloned())
-            .is_some()
-    } else {
-        toml::from_str::<toml::Value>(&text)
-            .ok()
-            .and_then(|v| {
-                v.get("mcp_servers")
-                    .and_then(|v| v.get("agent-hud"))
-                    .cloned()
-            })
-            .is_some()
+}
+/// Adds the server again with the client's own command line, so it starts
+/// `path`: removed first, so the add never meets an entry of that name.
+fn repoint(client: Client, places: &Places, path: &std::path::Path) -> Result<(), String> {
+    let executable = executable(client.id(), &places.home)
+        .ok_or("the client's command line is not installed")?;
+    for install in [false, true] {
+        run_client(
+            &executable,
+            &args(client, install, path),
+            &places.home,
+            Duration::from_secs(15),
+        )?;
     }
+    Ok(())
 }
 
 /// Refreshes an Agent HUD server only when its ownership or failure is safe to
@@ -71,6 +54,13 @@ fn installed(client: Client, places: &Places) -> bool {
 /// a missing old path.
 fn repair_server_path(client: Client, places: &Places, executable: &Path) -> Result<bool, String> {
     match client {
+        Client::Codex | Client::ClaudeCode
+            if entry::listed(client, places)
+                .is_some_and(|entry| entry.points_elsewhere(executable)) =>
+        {
+            repoint(client, places, executable)?;
+            Ok(true)
+        }
         Client::DeepSeek if installed(client, places) => {
             client.set_server(places, Some(executable))
         }
