@@ -41,10 +41,26 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
     // The CLI supplies exact windows; GetUserStatus only supplies model-family
     // totals with unknown duration. Do not show both as separate subscriptions
     // or replace a sampled CLI window with an incomparable family total.
+    // That holds for a current report. One the CLI stopped sending is only
+    // what the account last looked like: it gives way to a service that reads
+    // the same account now (`drop_stale`).
+    let stale: Vec<(String, String)> = reading
+        .account
+        .iter()
+        .chain(&reading.additional_accounts)
+        .filter(|row| row["stale"] == true)
+        .filter_map(|row| {
+            Some((
+                row["id"].as_str()?.to_owned(),
+                row["label"].as_str().unwrap_or_default().to_lowercase(),
+            ))
+        })
+        .collect();
     let reported: BTreeSet<String> = reading
         .quotas
         .iter()
         .filter_map(|quota| quota["accountId"].as_str().map(str::to_owned))
+        .filter(|id| !stale.iter().any(|(stale, _)| stale == id))
         .collect();
     let native = ACCOUNT_SERVICE.runs_on(host.os()).then(||host.native(
         AGENT.id,
@@ -67,6 +83,7 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
                         };
                         match parse(scope, &account["status"], &account["summary"]) {
                             Ok(mut next) => {
+                                drop_stale(&mut reading, &stale, &next);
                                 next.quotas.retain(|quota| {
                                     !quota["accountId"]
                                         .as_str()
@@ -123,6 +140,38 @@ pub fn read(host: &dyn Host) -> Result<Reading, Unread> {
         None
     };
     Ok(reading)
+}
+
+/// Takes out of `reading` the stale CLI report (`stale`: account id and
+/// lowercased email) of the account `next` reads now with windows of its
+/// own: by its id, or by its email, as the CLI names an account without its
+/// team. The CLI is named among the account's readers again while its saved
+/// sign-in names the account (`cli_email`).
+fn drop_stale(reading: &mut Reading, stale: &[(String, String)], next: &Reading) {
+    let Some(account) = next.account.as_ref().filter(|_| !next.quotas.is_empty()) else {
+        return;
+    };
+    let email = account["label"].as_str().map(str::to_lowercase);
+    for (id, label) in stale {
+        if account["id"] != id.as_str() && email.as_deref() != Some(label.as_str()) {
+            continue;
+        }
+        reading
+            .quotas
+            .retain(|quota| quota["accountId"] != id.as_str());
+        if reading
+            .account
+            .as_ref()
+            .is_some_and(|row| row["id"] == id.as_str())
+        {
+            reading.account = (!reading.additional_accounts.is_empty())
+                .then(|| reading.additional_accounts.remove(0));
+        } else {
+            reading
+                .additional_accounts
+                .retain(|row| row["id"] != id.as_str());
+        }
+    }
 }
 
 fn merge(reading: &mut Reading, next: Reading) {
