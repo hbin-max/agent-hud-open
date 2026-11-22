@@ -31,6 +31,20 @@ pub(super) struct Installation {
 pub(super) fn installation(home: &Path, env: &Environment) -> Installation {
     locate(home, env, &registered_applications())
 }
+/// Desktop programs rather than the app-server helpers in Codex's cache.
+pub(super) fn desktop_programs(home: &Path, env: &Environment) -> Vec<PathBuf> {
+    let mut paths = registered_applications();
+    for base in [local_app(home, env).join("Programs"),
+        variable(env, "ProgramFiles").unwrap_or_else(|| PathBuf::from("C:/Program Files"))] {
+        for name in ["Codex", "ChatGPT"] {
+            paths.push(base.join(name).join(format!("{name}.exe")));
+        }
+    }
+    paths.retain(|path| path.is_file());
+    paths.sort();
+    paths.dedup();
+    paths
+}
 
 fn locate(home: &Path, env: &Environment, registered: &[PathBuf]) -> Installation {
     let mut installed = false;

@@ -8,6 +8,10 @@ pub(crate) mod pipe;
 mod process;
 mod secrets;
 pub(crate) use apps::{activate_app, app_running, launch_app};
+pub(crate) fn codex_applications() -> Vec<std::path::PathBuf> {
+    let Ok(home) = home_dir() else { return Vec::new() };
+    codex::desktop_programs(&home, &std::env::vars().collect())
+}
 pub(crate) use process::{codex_cli_on_port, parent_processes, process_runs};
 pub(crate) use secrets::{app_cookie, stored_secret, unseal_safe_storage};
 pub(crate) const READS_PROCESS_ENVIRONMENT: bool = false;
