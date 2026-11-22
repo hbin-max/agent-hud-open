@@ -1,7 +1,12 @@
 // What an account's section says in words: whether it is current or when it
 // was last read, and when its earned resets expire. Kept apart from the
 // components so the tests can run them.
-import type { Account, Provider, ResetCredits } from "@agent-hud/protocol";
+import type {
+  Account,
+  Provider,
+  ResetCredits,
+  Snapshot,
+} from "@agent-hud/protocol";
 import {
   countdownRough,
   dateFormat,
@@ -25,6 +30,29 @@ export function accountReadLabel(
     Math.max(0, (now - (Number.isFinite(checked) ? checked : now)) / 1000),
   );
   return language === "zh" ? `上次读取 ${ago} 前` : `Last read ${ago} ago`;
+}
+
+/** When the panel's numbers were last read: the newest reading of any
+ * account, else of any window. Null before the first. */
+export function latestReading(
+  snapshot: Pick<Snapshot, "accounts" | "quotas">,
+): number | null {
+  const times = [
+    ...(snapshot.accounts ?? []).map((account) => account.checkedAt),
+    ...(snapshot.quotas ?? []).map((quota) => quota.observedAt),
+  ]
+    .map((at) => (at ? Date.parse(at) : NaN))
+    .filter(Number.isFinite);
+  return times.length ? Math.max(...times) : null;
+}
+
+/** The panel footer's words for `latestReading`: "Read just now" within a
+ * minute, then "Last read 5m ago". */
+export function readAgoLabel(at: number, now: number, language: Language) {
+  const seconds = Math.max(0, (now - at) / 1000);
+  if (seconds < 60) return say(language, "刚刚读取", "Read just now");
+  const ago = countdownRough(seconds);
+  return say(language, `上次读取 ${ago} 前`, `Last read ${ago} ago`);
 }
 
 /** What the vendor's status page says about the components the agent

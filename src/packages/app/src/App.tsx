@@ -159,6 +159,7 @@ function AppContent({
       }
     },
     query: (method, params) => act(method, params),
+    refresh: () => refresh(),
     openSettingsPage: (page) => {
       if (isTauri()) void invoke("hud_show_main", { page });
     },
