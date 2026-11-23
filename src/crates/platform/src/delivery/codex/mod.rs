@@ -13,6 +13,8 @@ mod transport;
 #[path = "windows.rs"]
 mod transport;
 pub(super) use transport::{queue_created, start_in_daemon, OPERATIONS, SUPPORTED};
+mod persist;
+pub(super) use persist::persist_started_thread;
 
 /// Host injection point for isolated fixtures or a shared native state adapter.
 pub trait CodexTransport: Send + Sync {
