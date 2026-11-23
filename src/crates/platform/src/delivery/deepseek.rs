@@ -38,6 +38,9 @@ impl DeepSeekChannel {
     pub fn loaded(&self, now: SystemTime) -> HashSet<String> {
         self.0.loaded(now)
     }
+    pub fn last_check_in(&self, session: &str) -> Option<SystemTime> {
+        self.0.last_check_in(bare(session))
+    }
     /// Whether `session` (either form) runs the plugin now.
     pub fn runs(&self, session: &str, now: SystemTime) -> bool {
         self.loaded(now).contains(bare(session))

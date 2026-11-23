@@ -7,6 +7,7 @@ impl Messaging {
         caller: &Caller,
         arguments: &Value,
         host: &Host<'_>,
+        extras: &[Value],
         now: i64,
     ) -> Result<Value> {
         let zh = language(host.snapshot);
@@ -43,7 +44,7 @@ impl Messaging {
         if same_session(to, &caller.session_id) {
             return Ok(refused(&words::to_self(zh)));
         }
-        let Some(target) = find(host.snapshot, to) else {
+        let Some(target) = find_any(host.snapshot, extras, to) else {
             return Ok(refused(&words::unknown(zh)));
         };
         let to = target["id"].as_str().unwrap_or(to);
@@ -54,8 +55,8 @@ impl Messaging {
         if !target["parentId"].is_null() {
             return Ok(refused(&words::child(zh)));
         }
-        let sender = party(host.snapshot, &caller.client, &caller.session_id);
-        let recipient = party(host.snapshot, client, to);
+        let sender = party_any(host.snapshot, extras, &caller.client, &caller.session_id);
+        let recipient = party_any(host.snapshot, extras, client, to);
         // One that cannot take it now is refused before anything is queued.
         if let (Value::Bool(false), reason) = self.reachable(client, to, &self.loaded(), zh) {
             (self.fly)(flight(&sender, &recipient, true, false, true));

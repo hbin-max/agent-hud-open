@@ -10,6 +10,7 @@
 //! The words are kept only while they are delivered: the journal keeps who sent
 //! what to whom, a fingerprint of the words and where the answer will be, and
 //! an answer is read again from the other session's transcript each time.
+mod extras;
 mod flights;
 mod get;
 mod journal;
@@ -32,6 +33,7 @@ use agent_hud_platform::delivery::{
     self, DeliveryState, LocalClients, Operation, PromptForm, Provider, SendRequest, SessionStarts,
     SessionTarget, StartReceipt, StartRequest, CLAUDE_MESSAGES_OFF, DEEPSEEK_MESSAGES_OFF,
 };
+use extras::*;
 use flights::flight;
 pub use flights::Flight;
 use journal::{Journal, Kind, Message, Party};
@@ -111,6 +113,7 @@ pub struct Messaging {
     starts: SessionStarts,
     follow: Follow,
     fly: Fly,
+    extra_cache: ExtraCache,
 }
 
 impl Messaging {
@@ -130,6 +133,7 @@ impl Messaging {
             starts,
             follow,
             fly,
+            extra_cache: ExtraCache::default(),
         }
     }
 
@@ -140,25 +144,19 @@ impl Messaging {
             return Ok(refused(&words::off(language(host.snapshot))));
         }
         // The sessions a message can go to, from this very snapshot.
-        self.clients.update_targets(sessions_targets(host.snapshot));
+        let extras = self.live_extras(host);
+        self.sync_targets(host, &extras);
         let caller = serde_json::from_value::<Caller>(params["caller"].clone())
             .ok()
-            .map(|mut caller| {
-                if let Some(session_id) =
-                    find(host.snapshot, &caller.session_id).and_then(|s| s["id"].as_str())
-                {
-                    caller.session_id = session_id.to_owned();
-                }
-                caller
-            });
+            .map(|caller| self.canonical_caller(host.snapshot, &extras, caller));
         let arguments = &params["arguments"];
         match params["name"].as_str().unwrap_or("") {
-            "list_sessions" => Ok(self.list(caller.as_ref(), host)),
+            "list_sessions" => Ok(self.list(caller.as_ref(), host, &extras)),
             "send_message" => {
                 let Some(caller) = caller else {
                     return Ok(refused(&words::no_caller(language(host.snapshot))));
                 };
-                self.send(&caller, arguments, host, now)
+                self.send(&caller, arguments, host, &extras, now)
             }
             "start_session" => {
                 let Some(caller) = caller else {

@@ -60,6 +60,16 @@ pub(crate) fn find<'a>(snapshot: &'a Value, id: &str) -> Option<&'a Value> {
         .iter()
         .find(|session| session["id"].as_str().is_some_and(|s| same_session(s, id)))
 }
+pub(crate) fn find_in<'a>(snapshot: &'a Value, client: &str, id: &str) -> Option<&'a Value> {
+    snapshot["sessions"].as_array()?.iter().find(|session| {
+        session["source"] == client
+            && session["id"].as_str().is_some_and(|s| same_session(s, id))
+    })
+}
+pub(crate) fn agent_on(snapshot: &Value, client: &str) -> bool {
+    snapshot["providers"].as_array().into_iter().flatten()
+        .find(|row| row["id"] == client).is_none_or(|row| row["enabled"] != false)
+}
 pub(crate) fn state(session: &Value) -> &'static str {
     match session["state"].as_str() {
         Some("running") => "running",

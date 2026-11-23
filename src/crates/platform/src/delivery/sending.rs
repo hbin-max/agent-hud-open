@@ -44,7 +44,10 @@ impl LocalClients {
                     && (target.session_id == request.session_id
                         || (request.provider == Provider::Antigravity
                             && antigravity_cascade_id(&target.session_id)
-                                == antigravity_cascade_id(&request.session_id)))
+                                == antigravity_cascade_id(&request.session_id))
+                        || (request.provider == Provider::DeepSeek
+                            && deepseek::bare(&target.session_id)
+                                == deepseek::bare(&request.session_id)))
                     && target.parent_id.is_none()
             })
             .cloned()
