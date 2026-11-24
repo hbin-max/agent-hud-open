@@ -26,6 +26,7 @@
 ## 验证及边界
 
 Windows x64 执行：完整 Rust 工作区 Release 测试、TypeScript 类型检查与测试、MCP 中继测试、安装器脚本测试、DeepSeek 插件测试，以及文件大小和包边界检查。
+最终通过：Rust 1042 项（1 项默认忽略）、前端 190 项（1 项跳过）、MCP 6 项、安装器 7 项、DeepSeek 插件 14 项；严格 Clippy（`-D warnings`）通过。
 详细最终结果与安装后核验记录保存在本机 `work/maintenance-*.log`、`work/maintenance-install-verification.json`。
 真实跨 AI 模型往返、macOS / Linux 平台构建，以及所有第三方客户端版本组合不因夹具测试通过而视为已验证。
 
@@ -46,5 +47,11 @@ pnpm --filter @agent-hud/desktop exec tauri build --bundles nsis --config '<本�
 覆盖前备份二进制、显示设置和 Codex / Claude MCP 配置；原用量数据库不删除、不合并。
 本机备份目录由 `work/maintenance-backup-path.txt` 记录，不含在 Git 仓库内。
 
-代码可回到 `bffb3861` 分支或回滚本分支各项提交。软件可重新运行保留的 `0.6.1-local.7` 安装包，并在关闭 HUD 后按备份清单恢复配置。
+本机已于 2026-11-24 经 NSIS 覆盖 E 盘，退出码为 0。主程序仅有预期 NSIS 包标记差异，engine / MCP 与打包资源逐字节相同。
+升级前后的 `settings.json`、`presentation.json` 哈希一致；Codex MCP 的实际 `command` 为 `E:\use\Agent HUD\Agent HUD.exe`，参数为 `--mcp`。
+已安装程序的正式 MCP 入口返回 `list_sessions`、`send_message`、`start_session` 和 `get_message`；OpenAI、DeepSeek、Antigravity 三家的账户读取均为 ready 且无 notice，Antigravity 有四条数值额度。
+Windows 界面已检查紧凑悬浮栏和展开页脚，点击刷新后面板正常，后续快照显示新的 DeepSeek / Antigravity 读取时间。
+未以这次检查宣称真实 AI 消息往返成功；也未对安装失败和回滚分支实施故障注入测试。
+
+代码可回到 `backup/pre-upstream-maintenance-20261124` 标签（`bffb3861`）；本分支的上游来源提交和兼容适配提交存在依赖，若按功能拆分或回滚，须连同相应适配重新测试。软件可重新运行保留的 `0.6.1-local.7` 安装包，并在关闭 HUD 后按备份清单恢复配置。
 回滚前保留更新后产生的数据；不要使用 `git reset --hard` 清除尚未提交的用户修改。
