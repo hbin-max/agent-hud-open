@@ -1,5 +1,46 @@
 use super::*;
 
+fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
+    super::parse_servers(processes, &HashMap::new())
+}
+
+#[test]
+fn saved_token_restores_hub_discovery_and_keeps_command_line_precedence() {
+    let root = tempfile::tempdir().unwrap();
+    let daemon = root.path().join(".gemini/antigravity/daemon");
+    std::fs::create_dir_all(&daemon).unwrap();
+    for (file, body) in [
+        ("hub.json", r#"{"pid":1,"csrfToken":"saved-1"}"#),
+        ("other.json", r#"{"pid":2,"csrfToken":"saved-2"}"#),
+        ("stale.json", r#"{"pid":9,"csrfToken":"saved-9"}"#),
+        ("bad.json", "{"),
+        ("control.json", r#"{"pid":3,"csrfToken":"bad\nvalue"}"#),
+    ] {
+        std::fs::write(daemon.join(file), body).unwrap();
+    }
+    std::fs::write(
+        daemon.join("oversized.json"),
+        format!(r#"{{"pid":4,"csrfToken":"{}"}}"#, "x".repeat(5000)),
+    )
+    .unwrap();
+    let saved = saved_tokens(root.path(), &crate::os::Environment::new());
+    assert_eq!(saved.len(), 3);
+    let exe = r"C:\Antigravity\language_server.exe";
+    let found = super::parse_servers(vec![
+        process(1, exe, "server --standalone --app_data_dir antigravity --read_host_bridge_token_from_stdin"),
+        process(2, exe, "server --csrf_token command-2"),
+        process(3, exe, "server --app_data_dir antigravity"),
+        process(9, r"C:\Other\unrelated.exe", "unrelated"),
+    ], &saved);
+    assert_eq!(
+        found
+            .iter()
+            .map(|s| (s.pid, s.token.as_str()))
+            .collect::<Vec<_>>(),
+        [(1, "saved-1"), (2, "command-2")]
+    );
+}
+
 fn process(pid: u32, executable: &str, command: &str) -> crate::os::ProcessInfo {
     crate::os::ProcessInfo {
         pid,

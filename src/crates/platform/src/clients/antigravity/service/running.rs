@@ -1,4 +1,6 @@
 //! The running Antigravity language servers and CLI, found by their process.
+//! Antigravity 2.34 saves its CSRF token in its daemon registration.
+use std::{collections::HashMap, path::Path};
 pub(super) struct Server {
     pub pid: u32,
     pub token: String,
@@ -33,10 +35,58 @@ fn flag(command: &str, name: &str) -> Option<String> {
 }
 
 pub(super) fn servers() -> Result<Vec<Server>, String> {
-    Ok(parse_servers(crate::os::processes()?))
+    let processes = crate::os::processes()?;
+    let env = std::env::vars().collect::<crate::os::Environment>();
+    let saved = crate::os::home_dir()
+        .ok()
+        .map(|home| saved_tokens(&home, &env))
+        .unwrap_or_default();
+    Ok(parse_servers(processes, &saved))
 }
 
-fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
+/// Backported from upstream 93ac21c9, using the existing storage descriptors.
+/// Entries are matched to a running server PID, then authenticated by GetUserStatus.
+fn saved_tokens(home: &Path, env: &crate::os::Environment) -> HashMap<u32, String> {
+    let mut tokens = HashMap::new();
+    for location in agent_hud_agents::antigravity::AGENT.discovery.storage {
+        for dir in crate::os::resolve(home, env, location) {
+            let Ok(entries) = std::fs::read_dir(dir.join("daemon")) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().is_none_or(|ext| ext != "json")
+                    || !entry
+                        .metadata()
+                        .is_ok_and(|meta| meta.is_file() && meta.len() <= 4096)
+                {
+                    continue;
+                }
+                let Some(saved) = std::fs::read(&path)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                else {
+                    continue;
+                };
+                let pid = saved["pid"]
+                    .as_u64()
+                    .and_then(|pid| u32::try_from(pid).ok());
+                let token = saved["csrfToken"].as_str().filter(|token| {
+                    !token.is_empty() && !token.bytes().any(|byte| byte.is_ascii_control())
+                });
+                if let (Some(pid), Some(token)) = (pid, token) {
+                    tokens.insert(pid, token.to_owned());
+                }
+            }
+        }
+    }
+    tokens
+}
+
+fn parse_servers(
+    processes: Vec<crate::os::ProcessInfo>,
+    saved: &HashMap<u32, String>,
+) -> Vec<Server> {
     let mut result = Vec::new();
     for process in processes {
         let pid = process.pid;
@@ -55,7 +105,9 @@ fn parse_servers(processes: Vec<crate::os::ProcessInfo>) -> Vec<Server> {
         if !server && !cli {
             continue;
         }
-        let token = flag(command, "csrf_token").unwrap_or_default();
+        let token = flag(command, "csrf_token")
+            .or_else(|| saved.get(&pid).cloned())
+            .unwrap_or_default();
         let extension = flag(command, "extension_server_port")
             .and_then(|value| value.parse::<u16>().ok())
             .filter(|port| *port != 0)
