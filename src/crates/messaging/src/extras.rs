@@ -5,7 +5,7 @@
 //! agree.
 use super::*;
 mod heads;
-use heads::*;
+pub(crate) use heads::*;
 use std::{
     collections::HashMap,
     sync::Mutex,
@@ -287,4 +287,3 @@ fn codex_extras(
     }
     extras
 }
-

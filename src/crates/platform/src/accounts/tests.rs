@@ -559,7 +559,7 @@ fn reset_later(provider: &'static str) -> Entry {
 }
 
 #[test]
-fn a_quiet_session_in_flight_keeps_its_provider_on_the_live_interval() {
+fn idle_and_live_accounts_both_refresh_before_their_future_reset() {
     let mut state = control();
     let claude = reset_later("claude");
     assert!(
@@ -570,14 +570,14 @@ fn a_quiet_session_in_flight_keeps_its_provider_on_the_live_interval() {
     assert_eq!(
         due_after(facts("claude"), &claude, &state),
         Duration::ZERO,
-        "live: read every 300 s"
+        "live and idle readings both refresh on the normal interval"
     );
     state.running.insert("claude".into());
     assert_eq!(due_after(facts("claude"), &claude, &state), Duration::ZERO);
 }
 
 #[test]
-fn only_providers_this_macs_work_moves_wait_for_their_reset() {
+fn every_enabled_provider_is_read_even_when_usage_is_on_another_device() {
     let mut state = control();
     for provider in ["copilot", "antigravity", "devin", "kimi"] {
         assert!(
@@ -592,8 +592,7 @@ fn only_providers_this_macs_work_moves_wait_for_their_reset() {
             "{provider}"
         );
     }
-    // Work that finished since the last reading is read at once, but only
-    // where this Mac's work moves the windows.
+    // Once the normal interval has passed, finished work does not postpone it.
     let later = chrono::Utc::now().timestamp_millis();
     state.finished.insert("opencode".into(), later);
     assert_eq!(
@@ -601,6 +600,27 @@ fn only_providers_this_macs_work_moves_wait_for_their_reset() {
         Duration::ZERO,
         "an open agent's work is the plans'"
     );
+}
+
+#[test]
+fn turn_end_settles_for_five_to_fifteen_seconds_and_honors_retry_after() {
+    let mut state = control();
+    let mut recent = reset_later("claude");
+    recent.attempted = Instant::now() - Duration::from_secs(90);
+    recent.attempted_ms = chrono::Utc::now().timestamp_millis() - 90_000;
+    for (spread, expected) in [(0, 5), (60, 15)] {
+        recent.spread = spread;
+        state
+            .finished
+            .insert("claude".into(), chrono::Utc::now().timestamp_millis());
+        let wait = due_after(facts("claude"), &recent, &state);
+        assert!(wait > Duration::from_secs(expected - 1) && wait <= Duration::from_secs(expected));
+    }
+    // Another turn ends while one runs: refresh still follows the completed turn.
+    state.running.insert("claude".into());
+    recent.retry_at = Some(Instant::now() + Duration::from_secs(300));
+    state.force.insert("claude".into());
+    assert!(due_after(facts("claude"), &recent, &state) > Duration::from_secs(299));
 }
 
 #[test]

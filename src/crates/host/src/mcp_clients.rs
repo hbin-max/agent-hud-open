@@ -7,8 +7,7 @@ use crate::client_cli::{executable, run_client};
 use agent_hud_runtime::hud_tools::{Client, Places, SkillState, CLIENTS};
 use serde_json::{json, Value};
 use std::{
-    fs,
-    path::{Path, PathBuf},
+    path::Path,
     sync::{Mutex, PoisonError},
     time::Duration,
 };

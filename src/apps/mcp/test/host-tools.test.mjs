@@ -133,7 +133,7 @@ test("host tools are listed with their schema and hand the Codex caller from the
       .requests()
       .filter((request) => request.method === "host_tool")
       .at(-1);
-    assert.deepEqual(unnamed(workCall.params), {
+    assert.deepEqual(workCall.params, {
       name: "some_tool",
       arguments: { text: "from work mode" },
       caller: {
@@ -141,7 +141,6 @@ test("host tools are listed with their schema and hand the Codex caller from the
         sessionId: "work-thread-2",
         turnId: "turn-10",
       },
-      parent: process.pid,
     });
     // Generic `thread_id` must not shadow an explicit Antigravity conversation id.
     await client.callTool({
@@ -156,7 +155,7 @@ test("host tools are listed with their schema and hand the Codex caller from the
       .requests()
       .filter((request) => request.method === "host_tool")
       .at(-1);
-    assert.deepEqual(unnamed(agCall.params), {
+    assert.deepEqual(agCall.params, {
       name: "some_tool",
       arguments: { text: "from antigravity" },
       caller: {
@@ -164,7 +163,6 @@ test("host tools are listed with their schema and hand the Codex caller from the
         sessionId: "cascade-99",
         turnId: null,
       },
-      parent: process.pid,
     });
   } finally {
     await client.close();
