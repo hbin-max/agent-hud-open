@@ -4,6 +4,7 @@
 use super::super::process::StdioServer;
 use super::handoff::job_state;
 use super::*;
+use serde_json::json;
 
 impl SessionStarts {
     pub(super) fn start_claude(
