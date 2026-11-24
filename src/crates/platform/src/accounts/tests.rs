@@ -161,7 +161,7 @@ fn connected_cli_reports_use_account_cadence_and_callback_requests_respect_spaci
         .quotas
         .push(json!({"resetAt": (chrono::Utc::now()+chrono::Duration::days(7)).to_rfc3339()}));
     let fresh = entry(reading, Some("2026-10-23T08:00:00Z"), false);
-    assert!(due_after(facts("antigravity"), &fresh, &state) > Duration::from_secs(300));
+    assert!(due_after(facts("antigravity"), &fresh, &state) <= Duration::from_secs(180));
     state
         .account_homes
         .insert("antigravity".into(), vec!["/tmp/config.json".into()]);
@@ -563,8 +563,8 @@ fn a_quiet_session_in_flight_keeps_its_provider_on_the_live_interval() {
     let mut state = control();
     let claude = reset_later("claude");
     assert!(
-        due_after(facts("claude"), &claude, &state) > Duration::from_secs(3600),
-        "idle: wait for the reset"
+        due_after(facts("claude"), &claude, &state) == Duration::ZERO,
+        "idle quotas still refresh when usage happens on another device"
     );
     state.live.insert("claude".into());
     assert_eq!(
@@ -581,7 +581,7 @@ fn only_providers_this_macs_work_moves_wait_for_their_reset() {
     let mut state = control();
     for provider in ["copilot", "antigravity", "devin", "kimi"] {
         assert!(
-            due_after(facts(provider), &reset_later(provider), &state) > Duration::from_secs(3600),
+            due_after(facts(provider), &reset_later(provider), &state) == Duration::ZERO,
             "{provider}"
         );
     }

@@ -70,7 +70,8 @@ export function PanelFooter({
       setRefreshing(false);
     });
   };
-  const refreshLabel = language === "zh" ? "重新读取所有额度" : "Read all agents again";
+  const refreshLabel =
+    language === "zh" ? "重新读取所有额度" : "Read all agents again";
   const footerButton = (color: string): CSSProperties => ({
     width: 28,
     height: 28,

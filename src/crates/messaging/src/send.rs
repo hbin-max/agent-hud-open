@@ -18,11 +18,10 @@ impl Messaging {
             .and_then(|parent| self.journal.find(parent))
             .cloned();
         if let Some(parent) = reply_to {
-            if replied
-                .as_ref()
-                .is_none_or(|message| message.to.client != caller.client
-                    || !same_session(&message.to.session_id, &caller.session_id))
-            {
+            if replied.as_ref().is_none_or(|message| {
+                message.to.client != caller.client
+                    || !same_session(&message.to.session_id, &caller.session_id)
+            }) {
                 return Ok(refused(&words::unknown_reply(zh, parent)));
             }
         }
@@ -40,21 +39,26 @@ impl Messaging {
         };
         let to = to.as_str();
         let mut owned_extras;
-        let extras = if let Some(row) = replied.as_ref()
-            .and_then(|parent| self.reply_extra(host, extras, &parent.from)) {
+        let extras = if let Some(row) = replied
+            .as_ref()
+            .and_then(|parent| self.reply_extra(host, extras, &parent.from))
+        {
             owned_extras = extras.to_vec();
             owned_extras.push(row);
             self.sync_targets(host, &owned_extras);
             owned_extras.as_slice()
-        } else { extras };
+        } else {
+            extras
+        };
         if let Some(reason) = check_text(text, zh) {
             return Ok(refused(&reason));
         }
         let target = if arguments["to"].as_str().is_some_and(|s| !s.is_empty()) {
             find_any(host.snapshot, extras, to)
         } else {
-            replied.as_ref().and_then(|parent|
-                find_in_any(host.snapshot, extras, &parent.from.client, to))
+            replied
+                .as_ref()
+                .and_then(|parent| find_in_any(host.snapshot, extras, &parent.from.client, to))
         };
         let Some(target) = target else {
             return Ok(refused(&words::unknown(zh)));
@@ -64,10 +68,14 @@ impl Messaging {
         if client == caller.client && same_session(to, &caller.session_id) {
             return Ok(refused(&words::to_self(zh)));
         }
-        if replied.as_ref().is_some_and(|parent|
-            parent.from.client != client || !same_session(&parent.from.session_id, to)) {
-            return Ok(refused(if zh { "to 与 reply_to 指向不同的会话" }
-                else { "to and reply_to identify different sessions" }));
+        if replied.as_ref().is_some_and(|parent| {
+            parent.from.client != client || !same_session(&parent.from.session_id, to)
+        }) {
+            return Ok(refused(if zh {
+                "to 与 reply_to 指向不同的会话"
+            } else {
+                "to and reply_to identify different sessions"
+            }));
         }
         if !matches!(client, "claude" | "codex" | "antigravity" | "deepseek") {
             return Ok(refused(&words::other_client(zh)));

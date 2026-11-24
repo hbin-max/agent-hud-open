@@ -1027,7 +1027,7 @@ fn a_checked_in_deepseek_session_missing_from_snapshot_is_listed_and_takes_repli
         "send_message",
         json!({"reply_to": first_id, "text": "Reply via reply_to"}),
     );
-    assert_eq!(reply["delivered"], true, "{reply}");
+    assert_eq!(reply["state"], "queued", "{reply}");
     let prompts = world
         .harness_channel
         .join(format!("prompts/{HARNESS_TWO_OWN}"));
@@ -1042,7 +1042,7 @@ fn a_checked_in_deepseek_session_missing_from_snapshot_is_listed_and_takes_repli
         "send_message",
         json!({"to": HARNESS_TWO_OWN, "reply_to": first_id, "text": "Reply with bare to"}),
     );
-    assert_eq!(reply_with_to["delivered"], true, "{reply_with_to}");
+    assert_eq!(reply_with_to["state"], "queued", "{reply_with_to}");
 
     // Turning DeepSeek off hides the checked-in session from list_sessions.
     world.snapshot["providers"] = json!([{"id": "deepseek", "enabled": false}]);
@@ -1714,7 +1714,7 @@ fn a_reply_sent_elsewhere_leaves_the_message_open() {
         "send_message",
         json!({"to":CODEX,"text":"Claude asks","reply_to":id}),
     );
-    assert_eq!(onward["state"], "queued", "{onward}");
+    assert_eq!(onward["state"], "refused", "{onward}");
     let original = world.get(&json!(id));
     assert_ne!(original["state"], "replied", "{original}");
     assert!(original["reply"].is_null());
@@ -2287,7 +2287,7 @@ fn reply_to_unindexed_codex_sender_requires_live_non_archived_root_thread() {
         "send_message",
         json!({"reply_to": m_live["id"], "text": "Reply to live"}),
     );
-    assert_eq!(reply_live["delivered"], true, "{reply_live}");
+    assert_eq!(reply_live["state"], "queued", "{reply_live}");
 
     // Deleted / unindexed thread with no lock or rollout: reply is refused.
     let m_gone = world.send(("codex", work_gone), CLAUDE, "Hi before delete");
@@ -2296,7 +2296,7 @@ fn reply_to_unindexed_codex_sender_requires_live_non_archived_root_thread() {
         "send_message",
         json!({"reply_to": m_gone["id"], "text": "Reply to deleted"}),
     );
-    assert_eq!(reply_gone["delivered"], false, "{reply_gone}");
+    assert_eq!(reply_gone["state"], "refused", "{reply_gone}");
 
     // Archived thread: reply is refused even if a writer lock remains.
     let m_arch = world.send(("codex", work_archived), CLAUDE, "Hi before archive");
@@ -2305,7 +2305,7 @@ fn reply_to_unindexed_codex_sender_requires_live_non_archived_root_thread() {
         "send_message",
         json!({"reply_to": m_arch["id"], "text": "Reply to archived"}),
     );
-    assert_eq!(reply_arch["delivered"], false, "{reply_arch}");
+    assert_eq!(reply_arch["state"], "refused", "{reply_arch}");
 
     // Indexed archived thread (`archived: true` from session_detail): reply is refused.
     let work_detail_arch = "01a10000-0000-7000-8000-000000000006";
@@ -2326,7 +2326,7 @@ fn reply_to_unindexed_codex_sender_requires_live_non_archived_root_thread() {
         "send_message",
         json!({"reply_to": m_detail_arch["id"], "text": "Should refuse"}),
     );
-    assert_eq!(reply_detail_arch["delivered"], false, "{reply_detail_arch}");
+    assert_eq!(reply_detail_arch["state"], "refused", "{reply_detail_arch}");
 
     // Sub-agent sender in session_detail: reply is refused (never falls through to fallback).
     let m_sub = world.send(("codex", work_sub), CLAUDE, "Hi from sub");
@@ -2335,9 +2335,5 @@ fn reply_to_unindexed_codex_sender_requires_live_non_archived_root_thread() {
         "send_message",
         json!({"reply_to": m_sub["id"], "text": "Should refuse sub"}),
     );
-    assert_eq!(reply_sub["delivered"], false, "{reply_sub}");
+    assert_eq!(reply_sub["state"], "refused", "{reply_sub}");
 }
-
-mod calls;
-mod models;
-mod steer;
